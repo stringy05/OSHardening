@@ -755,7 +755,7 @@ chmod 644 /etc/issue.net
 #8.2 Remove OS Information from Login Warning Banners
 egrep '(\\v|\\r|\\m|\\s)' /etc/issue
 egrep '(\\v|\\r|\\m|\\s)' /etc/motd
-egrep'(\\v|\\r|\\m|\\s)' /etc/issue.net
+egrep '(\\v|\\r|\\m|\\s)' /etc/issue.net
 sed -i '/\v/d' /etc/issue
 sed -i '/\r/d' /etc/issue
 sed -i '/\m/d' /etc/issue
@@ -796,8 +796,7 @@ echo "9.1.11 - Locate files that are owned by users or groups not listed in the 
 touch /tmp/unowned.sh
 cat << 'EOM' > /tmp/unowned.sh
 #!/bin/bash
-df --local -P | awk {'if (NR!=1) print $6'} | xargs -I '{}' find '{}' -xdev -nouser -
-ls
+df --local -P | awk {'if (NR!=1) print $6'} | xargs -I '{}' find '{}' -xdev -nouser -ls
 EOM
 bash /tmp/unowned.sh
 #9.1.12 Find Un-grouped Files and Directories
@@ -805,13 +804,12 @@ echo "9.2.12 - Locate files that are owned by users or groups not listed in the 
 touch /tmp/ungrouped.sh
 cat << 'EOM' > /tmp/ungrouped.sh
 #!/bin/bash
-df --local -P | awk {'if (NR!=1) print $6'} | xargs -I '{}' find '{}' -xdev -nogroup -
-ls
+df --local -P | awk {'if (NR!=1) print $6'} | xargs -I '{}' find '{}' -xdev -nogroup -ls
 EOM
 bash /tmp/ungrouped.sh
 #9.1.13 Find SUID System Executables - not done
 #9.1.14 Find SGID System Executables
-/bin/rpm -V `/bin/rpm -qf sudo`
+/bin/rpm -V `/bin/rpm -qf /usr/bin/sudo`
 ############################
 #9.2 Review User and Group Settings
 #9.2.1 Ensure Password Fields are Not Empty
@@ -830,8 +828,7 @@ echo "Delete any entries that return"
 #9.2.5 Verify No UID 0 Accounts Exist Other Than root
 echo "#9.2.5 Verify No UID 0 Accounts Exist Other Than root"
 echo "Delete any entries that return"
-/bin/cat /etc/passwd | /bin/awk -F: '($3 == 0) { print $1 }'
-root
+/bin/cat /etc/passwd | /bin/awk -F: '($3 == 0) { print $1 }' | grep -v root
 #9.2.6 Ensure root PATH Integrity
 echo "#9.2.6 Ensure root PATH Integrity"
 echo "Correct or justify any items discovered in the Audit step."
@@ -841,7 +838,7 @@ cat << 'EOM' > /tmp/rootpath.sh
 if [ "`echo $PATH | /bin/grep :: `" != "" ]; then
     echo "Empty Directory in PATH (::)"
 fi
-if [ "`echo $PATH | bin/grep :$`"  != "" ]; then
+if [ "`echo $PATH | /bin/grep :$`"  != "" ]; then
     echo "Trailing : in PATH"
 fi
 p=`echo $PATH | /bin/sed -i -e 's/::/:/' -e 's/:$//' -e 's/:/ /g'`
@@ -860,12 +857,14 @@ while [ "$1" != "" ]; do
         if [ `echo $dirperm | /bin/cut -c9 ` != "-" ]; then
             echo "Other Write permission set on directory $1"
         fi
-            dirown=`ls -ldH $1 | awk '{print $3}'`
-           if [ "$dirown" != "root" ] ; then
+        dirown=`ls -ldH $1 | awk '{print $3}'`
+        if [ "$dirown" != "root" ] ; then
              echo $1 is not owned by root
-fi else
+        fi 
+    else
             echo $1 is not a directory
-fi shift
+    fi 
+    shift
 done
 EOM
 bash /tmp/rootpath.sh
@@ -1131,6 +1130,7 @@ mv /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 /bin/cat << EOM > /etc/ssh/sshd_config
 ## Random SSH port
 Port 22
+Port 10022
 ## Sets listening address on server. default=0.0.0.0
 #ListenAddress 192.168.0.1
 ## Enforcing SSH Protocol 2 only
@@ -1169,6 +1169,13 @@ AllowGroups admins users whomever
 #if you run a command through SSH directly without going interactive (EX: ssh root@system COMMAND), the command won’t be logged anywhere.
 #this line will fix that
 ForceCommand if [[ -z \$SSH_ORIGINAL_COMMAND ]]; then bash; else printf "\x23\`date +%s\`\n\$SSH_ORIGINAL_COMMAND\n" >> .bash_history; bash -c "\$SSH_ORIGINAL_COMMAND"; fi
+Subsystem       sftp    internal-sftp
+Match Group sftp
+    X11Forwarding no
+    ChrootDirectory /sftp_jail/%u
+    AllowTcpForwarding no
+    ForceCommand internal-sftp
+
 EOM
 #start ssh services
 #service sshd start
@@ -1183,8 +1190,8 @@ chmod 600 /etc/ssh/sshd_config
 ##############################################################################
 echo "configure firewall"
 #opens http, https, ftp, and ssh
-TCPPORTS=( 80 443 22 )
-UDPPORTS=( 21 )
+TCPPORTS=( 22  10022 )
+UDPPORTS=( )
 echo "--- Install and Clear IPTables Firewall  ---"
 yum -y install -y iptables
 chkconfig iptables on
@@ -1297,9 +1304,9 @@ echo "--- Enabling Real time bash history for root ---"
 /bin/cat << EOM > /root/.bashrc
 # .bashrc
 # User specific aliases and functions
-alias rm='rm -i`
-alias cp='cp -i`
-alias mv='mv -i`
+alias rm='rm -i'
+alias cp='cp -i'
+alias mv='mv -i'
 # Source global definitions
 if [ -f /etc/bashrc ]; then
         . /etc/bashrc
@@ -1312,6 +1319,7 @@ shopt -s histappend                      # append to history, don't overwrite it
 # After each command, append to the history file and reread it
 export PROMPT_COMMAND="history -a; history -c; history -r; $PROMPT_COMMAND"
 EOM
+
 #backup skel bashrc
 cp /etc/skel/.bashrc /etc/skel/.bashrc.bk
 #reconfigure /etc/skel/.bashrc
@@ -1319,9 +1327,9 @@ echo "--- Enabling Real time bash history for all future users ---"
 /bin/cat << EOM > /etc/skel/.bashrc
 # .bashrc
 # User specific aliases and functions
-alias rm='rm -i`
-alias cp='cp -i`
-alias mv='mv -i`
+alias rm='rm -i'
+alias cp='cp -i'
+alias mv='mv -i'
 # Source global definitions
 if [ -f /etc/bashrc ]; then
         . /etc/bashrc
