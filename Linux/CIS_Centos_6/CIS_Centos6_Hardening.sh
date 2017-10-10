@@ -1165,14 +1165,14 @@ PermitEmptyPasswords no
 #Banner /etc/motd
 PrintMotd yes
 ## Add users or groups that are allowed to log in
-AllowGroups admins users whomever
+AllowGroups admins users whomever sftp
 #if you run a command through SSH directly without going interactive (EX: ssh root@system COMMAND), the command won’t be logged anywhere.
 #this line will fix that
 ForceCommand if [[ -z \$SSH_ORIGINAL_COMMAND ]]; then bash; else printf "\x23\`date +%s\`\n\$SSH_ORIGINAL_COMMAND\n" >> .bash_history; bash -c "\$SSH_ORIGINAL_COMMAND"; fi
 Subsystem       sftp    internal-sftp
 Match Group sftp
     X11Forwarding no
-    ChrootDirectory /sftp_jail/%u
+    ChrootDirectory %h
     AllowTcpForwarding no
     ForceCommand internal-sftp
 
